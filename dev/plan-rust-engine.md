@@ -1,7 +1,10 @@
 # [Rust-Engine] a compiled engine for exact compound distributions
 
-Status: `[Rust-Scaffold]` **DONE** at 1.0.0a1 on 2026-10-09. Everything below
-it is specified and not implemented. `[Rust-Reconstruction]` is next.
+Status: `[Rust-Scaffold]` **DONE** at 1.0.0a1 and `[Rust-Reconstruction]`
+**DONE** at 1.0.0a2, both 2026-10-09; see the execution log at the end.
+`[Rust-Transform]` is next and `[Rust-Query-Object]` was not promoted, since
+the limb conversion came in at 0.9 s against its 3 s budget. The `aggregate`
+side's `[NTT-Rust-Integration]` plan is now unblocked.
 
 This plan is written for a reader with no prior context, including no memory of
 the `aggregate` session that produced it. Its reflected half is
@@ -373,3 +376,58 @@ pickling.
 
 **Distributions other than the bounded discrete compound.** The whole method
 rests on the answer being a polynomial with bounded integer coefficients.
+
+## Execution log
+
+### [Rust-Reconstruction], DONE at 1.0.0a2 on 2026-10-09
+
+Implemented as specified: the online merge stack in `src/crt.rs`, `rayon`
+inside each merge over coefficients, GIL released via `Python::detach` for
+every push and the finish drain, `finish` returning the uniform-width limb
+array and the modulus bytes. All arithmetic is `num_bigint::BigUint`, so the
+overflow discipline is discharged by construction.
+
+**Acceptance, measured on DOOB, release build with `target-cpu=native`,
+via `dev/bench-reconstruction.py`** (headline shape: 322 primes for a
+`2**9976` bound, 10^6 + 1 coefficients, random residues, spot checked):
+
+| measure | result | acceptance |
+|---|---|---|
+| reconstruction (push + finish) | 6.7 s | at or below 25 s |
+| bulk limb to int conversion | 0.9 s | under 3 s |
+| peak working set | 2.69 GiB | about twice the 1.17 GiB answer |
+
+So about 28x against Python's 187.0 s at four workers, and
+`[Rust-Query-Object]` is **not** promoted ahead of `[Rust-Transform]`.
+
+**Divergences, all recorded at the moment they were made:**
+
+1. **The narrow merges are parallel after all.** The plan ruled "do not
+   parallelize the narrow merges" behind a measured width gate. Measured
+   head to head on the headline shape, serial below 128 bits ran 30.2 s
+   total where all-parallel with a 4096-coefficient minimum task chunk ran
+   6.7 s: the narrow levels are most of the merge count, and coarse chunking
+   keeps `rayon`'s bookkeeping far below even one-limb arithmetic. The width
+   gate collapsed into the chunk floor `PARALLEL_MIN_CHUNK` in `src/crt.rs`,
+   where the measurement is also cited.
+2. **`push` validates residues against their prime** and `new` rejects
+   values below 2, neither asked for by the plan. The seam contract says
+   residues arrive reduced; checking costs one linear pass and turns a
+   broken caller into a loud `ValueError` instead of a silently wrong
+   reconstruction, which is the repository's standing rule. No signature
+   changed and `PROTOCOL_VERSION` stays 1.
+3. **The Barrett and reciprocal re-measurement from [Rust-Bigint-Choice] was
+   not run.** Acceptance was met at 3.7x margin with `num-bigint`'s
+   schoolbook division, so there is nothing to decide yet. Revisit only if
+   `[Rust-Transform]`'s 64-bit primes shift the reconstruction profile.
+4. **The plan's prime count of 321 is 322 in the benchmark**, because the
+   bench rounds the bound to `2**9976` rather than using the real
+   denominator. Shape-equivalent; not a discrepancy in the engine.
+
+Conformance landed in `tests/test_conformance.py`: the random-residue tests
+un-xfailed (uniqueness below the modulus makes residue checks bit-for-bit),
+drain shapes at 1, 2, 3 and 13 primes on hardcoded primes so they run with no
+`aggregate` installed, limb-width pinning, lifecycle refusals, and end-to-end
+recovery of `exact_compound_poly` coefficients through the engine. The four
+`ntt_engine` tests stay xfail until `[NTT-Rust-Integration]` lands in
+`aggregate`, which this milestone unblocks.

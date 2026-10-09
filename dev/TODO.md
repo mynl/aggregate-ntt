@@ -7,17 +7,9 @@ repository, which is this plan's reflected half.
 
 ## In flight
 
-- **[Rust-Reconstruction]** (`dev/plan-rust-engine.md`) — the Chinese
-  remainder phase, the first kernel and the larger half of the cost (86
-  percent of `aggregate`'s threaded wall clock). Balanced product tree built
-  online as a merge stack, the same structure the Python side uses so the two
-  compare level by level, with `rayon` parallelizing *inside* each wide merge
-  over coefficients and the GIL released for the duration. Narrow merges stay
-  serial, since at one or two primes the arithmetic is smaller than the task
-  overhead. Target: the headline 1000 x 1000 case's reconstruction at or below
-  25 s against 187 s today. Watch the boundary: `finish` returns fixed-width
-  limbs, and the bulk conversion to Python integers must come in under 3 s or
-  `[Rust-Query-Object]` gets promoted ahead of the transform.
+Nothing in flight. `[Rust-Transform]` is next, and the `aggregate` side's
+`[NTT-Rust-Integration]` plan is now unblocked by `[Rust-Reconstruction]`
+landing.
 
 ## Next
 
@@ -38,6 +30,17 @@ repository, which is this plan's reflected half.
   reshapes how `aggregate` builds `p_exact`.
 
 ## Recently landed
+
+- **[Rust-Reconstruction]** DONE at **1.0.0a2** (2026-10-09): the Chinese
+  remainder kernel, a balanced product tree built online as a merge stack
+  with every merge `rayon`-parallel over coefficients behind a released GIL.
+  Headline shape reconstruction 6.7 s against the 25 s acceptance (Python:
+  187 s at four workers); limb conversion 0.9 s against 3 s, so
+  `[Rust-Query-Object]` stays behind `[Rust-Transform]`; peak memory about
+  2.3x the answer. One measured divergence: the narrow merges parallelize
+  too, with coarse task chunks instead of the planned width gate, 30.2 s
+  against 6.7 s. Details in the execution log of `dev/plan-rust-engine.md`
+  and the benchmark in `dev/bench-reconstruction.py`.
 
 - **[Rust-Scaffold]** DONE at **1.0.0a1** (2026-10-09): repository, Cargo and
   maturin project, PyO3 0.29.3 with `abi3-py313`, mixed Rust and Python
