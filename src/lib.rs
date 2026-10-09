@@ -30,7 +30,14 @@ mod ntt;
 /// does not know, rather than computing against a surface that moved. Two
 /// separately versioned packages will drift; the one unacceptable outcome is a
 /// silently wrong answer instead of a loud refusal.
-const PROTOCOL_VERSION: u32 = 1;
+///
+/// History: 1 declared the seam with both kernels raising
+/// `NotImplementedError`. 2 (1.0.0a3) changed `residues_mod_prime` as the
+/// kernel landed: `ds` became a reduced `u64` scalar rather than an array,
+/// and the reduced-input contract was pinned (weights and `ds` arrive mod
+/// `prime`). No call at protocol 1 could ever have computed with the old
+/// signature, but the rule is the rule: any signature change bumps.
+const PROTOCOL_VERSION: u32 = 2;
 
 /// The seam contract version this build implements.
 #[pyfunction]

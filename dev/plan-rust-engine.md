@@ -1,10 +1,14 @@
 # [Rust-Engine] a compiled engine for exact compound distributions
 
-Status: `[Rust-Scaffold]` **DONE** at 1.0.0a1 and `[Rust-Reconstruction]`
-**DONE** at 1.0.0a2, both 2026-10-09; see the execution log at the end.
-`[Rust-Transform]` is next and `[Rust-Query-Object]` was not promoted, since
-the limb conversion came in at 0.9 s against its 3 s budget. The `aggregate`
-side's `[NTT-Rust-Integration]` plan is now unblocked.
+Status: `[Rust-Scaffold]` **DONE** at 1.0.0a1, `[Rust-Reconstruction]`
+**DONE** at 1.0.0a2, and the 32-bit half of `[Rust-Transform]` **DONE** at
+1.0.0a3 as `[Transform-32]`, all 2026-10-09; see the execution log at the
+end. **The seam is at protocol 2 since 1.0.0a3** and `aggregate` owes
+`_ENGINE_PROTOCOL = 2`. `[Transform-64]` is in flight. `[Rust-Query-Object]`
+was not promoted, since the limb conversion came in at 0.9 s against its 3 s
+budget. Ruling of 2026-10-09 on prime selection: `aggregate.ntt.ntt_primes`
+grows a width parameter (option 1 of the integration plan) and the engine's
+ceiling is `p < 2**63`.
 
 This plan is written for a reader with no prior context, including no memory of
 the `aggregate` session that produced it. Its reflected half is
@@ -431,3 +435,57 @@ drain shapes at 1, 2, 3 and 13 primes on hardcoded primes so they run with no
 recovery of `exact_compound_poly` coefficients through the engine. The four
 `ntt_engine` tests stay xfail until `[NTT-Rust-Integration]` lands in
 `aggregate`, which this milestone unblocks.
+
+### [Transform-32], DONE at 1.0.0a3 on 2026-10-09
+
+The per-prime kernel in `src/ntt.rs`, mirroring `_residues_mod_prime`,
+`ntt`, `_spectral_walk` and `_spectral_walk_singular` step for step: forward
+radix-2 decimation-in-time NTT, spectral evaluation over the frequency runs
+with the closed-form geometric series and the `b == 1` degenerate mask,
+singular walk on a prime dividing the severity denominator, inverse NTT, the
+aliasing check beyond the support. All arithmetic is one Montgomery field
+with 64-bit words over odd primes below `2**63`, so the identical kernel
+carries `[Transform-64]`; the `t + m * p` overflow trap is discharged in
+`u128` with the bound written at the line. The GIL is released for the whole
+call and across-prime parallelism stays on the caller's thread pool, so
+there is no `rayon` inside a call to oversubscribe against the
+reconstruction's own pool.
+
+**Acceptance, measured on DOOB, release build with `target-cpu=native`, via
+`dev/bench-transform.py --width 32`** (headline case, 321 32-bit primes, 16
+workers):
+
+| measure | result | acceptance |
+|---|---|---|
+| transform phase alone | 4.3 s | at or below 10 s (Python 104.8 s serial) |
+| end to end through the engine | 10.3 s | low tens of seconds (Python 212.3 s) |
+
+**Divergences, recorded as made:**
+
+1. **The seam moved and `PROTOCOL_VERSION` is 2.** The scaffold declared
+   `ds` as a `u64` array; the reference needs a scalar, and the cleared
+   weights can exceed any prime, so the landed signature takes everything
+   reduced modulo the prime by the caller (the same one-line reduction the
+   Python reference performs internally, at identical cost). No protocol 1
+   caller could ever have computed with the old signature, it always raised,
+   but any signature change bumps. `aggregate` owes `_ENGINE_PROTOCOL = 2`;
+   until then its `'auto'` falls back to pure Python with one warning and
+   its `'rust'` refuses, both its own designed behavior.
+2. **`(b - 1)**-1` is Montgomery batch inversion**, three multiplies per
+   element plus one scalar Fermat, instead of the Python side's elementwise
+   Fermat exponentiation (about `2 * log2(p)` full-array multiplies). The
+   inverse is unique so the values are identical; the win doubles at 64-bit
+   primes, where the Fermat exponent doubles and the trick does not.
+3. **No four-step cache decomposition yet.** The plain iterative transform
+   met acceptance with 2.3x margin, so the plan's cache-resident
+   decomposition stays unimplemented until a measurement demands it.
+4. **The engine validates reduced inputs** (weights, `ds`, root
+   primitivity, run consistency, prime width and parity) and refuses loudly,
+   beyond what the plan asked, consistent with the repository's standing
+   rule.
+
+The prime-width ruling arrived with this phase (2026-10-09): `aggregate`'s
+`ntt_primes` grows a width parameter and reports the primes over, option 1
+of the integration plan. The ceiling the engine imposes is `p < 2**63`,
+Montgomery headroom; `ntt_primes` at width 64 must scan below `2**63`, not
+`2**64`.

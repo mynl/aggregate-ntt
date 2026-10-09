@@ -17,13 +17,16 @@ Three references, in increasing independence:
   engine's answer too: coefficients sum to exactly the denominator, none is
   negative, and none beyond the support is nonzero.
 
-``[Rust-Reconstruction]`` has landed, so its tests run for real. The
-transform kernel still raises ``NotImplementedError`` and its test stays an
-expected failure until ``[Rust-Transform]`` lands.
+Both kernels have landed, so the per-kernel tests run for real. The four
+end-to-end tests driving :func:`aggregate.ntt.exact_compound` with
+``ntt_engine='rust'`` stay expected failures until ``aggregate`` speaks seam
+protocol 2 (its ``_ENGINE_PROTOCOL``), at which point they flip to XPASS and
+their markers come off.
 """
 
 import random
 from fractions import Fraction
+from math import lcm
 
 import numpy as np
 import pytest
@@ -224,9 +227,9 @@ def test_reconstruction_recovers_oracle_coefficients(seed):
     assert numerators == expected
 
 
-@pytest.mark.xfail(reason='needs [Rust-Reconstruction] here and the '
-                          'ntt_engine keyword from the integration plan in '
-                          'aggregate; not strict, since it fails two ways',
+@pytest.mark.xfail(reason='aggregate speaks seam protocol 1 and this engine '
+                          'speaks 2, so ntt_engine="rust" refuses; flips to '
+                          'XPASS when aggregate bumps _ENGINE_PROTOCOL',
                    strict=False)
 @pytest.mark.parametrize('seed', range(4))
 def test_exact_compound_matches_the_polynomial_oracle(seed):
@@ -260,14 +263,222 @@ def test_exact_compound_matches_the_polynomial_oracle(seed):
 
 # ----------------------------------------------------- [transform kernel]
 
-@pytest.mark.xfail(reason='[Rust-Transform] kernel not implemented yet',
-                   raises=NotImplementedError, strict=True)
-def test_residues_mod_prime_matches_python():
+def _cleared(probs):
+    """Least common denominator and integer weights of exact probabilities.
+
+    The same construction ``aggregate.ntt._clear_denominators`` performs,
+    reimplemented here (it is two lines) so the only private reach in this
+    file stays ``_residues_mod_prime``, the sanctioned comparison target.
+    """
+    denominator = lcm(*[f.denominator for f in probs])
+    return denominator, [int(f * denominator) for f in probs]
+
+
+def _maximal_runs(outcomes, weights):
+    """Maximal equal-weight consecutive runs, as ``aggregate`` builds them."""
+    runs = []
+    start, weight, run_length = outcomes[0], weights[0], 1
+    for k, f in zip(outcomes[1:], weights[1:]):
+        if k == start + run_length and f == weight:
+            run_length += 1
+        else:
+            runs.append((start, run_length, weight))
+            start, weight, run_length = k, f, 1
+    runs.append((start, run_length, weight))
+    return runs
+
+
+def _transform_inputs(freq_outcomes, freq_probs, sev_outcomes, sev_probs):
+    """Everything ``exact_compound`` derives before the per-prime phase."""
+    df, big_f = _cleared(freq_probs)
+    ds, big_q = _cleared(sev_probs)
+    kmax = max(freq_outcomes)
+    support = kmax * max(sev_outcomes)
+    length = 1 << support.bit_length()
+    denominator = df * ds ** kmax
+    sev_index = np.array(sev_outcomes, dtype=np.int64)
+    freq_runs = _maximal_runs(freq_outcomes, big_f)
+    return sev_index, big_q, freq_runs, ds, kmax, support, length, denominator
+
+
+def _engine_residues(prime, root, length, support, sev_index, big_q,
+                     freq_runs, ds, kmax):
+    """Call the engine with the caller-reduced inputs the seam specifies."""
+    return aggregate_ntt.residues_mod_prime(
+        prime, root, length, support, sev_index,
+        np.array([q % prime for q in big_q], dtype=np.uint64),
+        [(start, run_length, weight % prime)
+         for start, run_length, weight in freq_runs],
+        ds % prime, kmax)
+
+
+# Three shapes that between them cover every spectral branch: a uniform case
+# (one long run, the geometric series and its b == 1 degenerate mask), an
+# irregular case (singleton runs, gap bridging, a zero frequency outcome),
+# and a weighted case with mixed denominators (nontrivial ds and df, one run
+# long enough for the series next to short walked runs).
+_TRANSFORM_CASES = [
+    (list(range(1, 13)), [Fraction(1, 12)] * 12,
+     list(range(1, 13)), [Fraction(1, 12)] * 12),
+    ([0, 1, 2, 5, 9], [Fraction(1, 4), Fraction(1, 8), Fraction(1, 8),
+                       Fraction(1, 4), Fraction(1, 4)],
+     [0, 2, 7], [Fraction(2, 5), Fraction(1, 5), Fraction(2, 5)]),
+    (list(range(2, 11)), [Fraction(1, 18)] * 8 + [Fraction(5, 9)],
+     [1, 2, 3], [Fraction(1, 2), Fraction(1, 3), Fraction(1, 6)]),
+]
+
+
+@pytest.mark.parametrize('case', range(len(_TRANSFORM_CASES)))
+def test_residues_mod_prime_matches_python(case):
     """One prime's residues, against ``aggregate.ntt._residues_mod_prime``.
 
-    Filled in with the real argument shapes when ``[Rust-Transform]``
-    starts; the reference call is private on purpose, since this is the one
-    place a private name is legitimately the comparison target.
+    Bit-for-bit per prime on every prime the case needs. The reference call
+    is private on purpose: this is the one place a private name is
+    legitimately the comparison target. The engine receives caller-reduced
+    inputs per its seam contract; the reference reduces internally.
     """
-    raise NotImplementedError(
-        '[Rust-Transform] kernel not implemented yet')
+    ntt = pytest.importorskip('aggregate.ntt')
+    freq_outcomes, freq_probs, sev_outcomes, sev_probs = \
+        _TRANSFORM_CASES[case]
+    (sev_index, big_q, freq_runs, ds, kmax, support, length,
+     denominator) = _transform_inputs(freq_outcomes, freq_probs,
+                                      sev_outcomes, sev_probs)
+    for prime, root in ntt.ntt_primes(length, denominator):
+        expected, _ = ntt._residues_mod_prime(
+            prime, root, length, support, sev_index, big_q, freq_runs,
+            ds, kmax)
+        got = _engine_residues(prime, root, length, support, sev_index,
+                               big_q, freq_runs, ds, kmax)
+        assert got.dtype == np.uint64
+        assert np.array_equal(got, expected), f'prime {prime}'
+
+
+def test_residues_mod_prime_singular_prime():
+    """A prime dividing the severity denominator takes the singular walk.
+
+    The geometric path needs ``ds**-1 mod p``, which does not exist when
+    ``p`` divides ``ds``; the reduced ``ds == 0`` routes the engine's
+    singular walk exactly as ``ds % prime == 0`` routes Python's. Built by
+    putting an NTT prime itself into the severity denominators.
+    """
+    ntt = pytest.importorskip('aggregate.ntt')
+    pairs = ntt.ntt_primes(16, 10 ** 20)
+    singular_prime = pairs[0][0]
+    freq_outcomes, freq_probs = [1, 2], [Fraction(1, 2), Fraction(1, 2)]
+    sev_outcomes = [0, 1]
+    sev_probs = [Fraction(1, singular_prime),
+                 Fraction(singular_prime - 1, singular_prime)]
+    (sev_index, big_q, freq_runs, ds, kmax, support, length,
+     denominator) = _transform_inputs(freq_outcomes, freq_probs,
+                                      sev_outcomes, sev_probs)
+    assert ds == singular_prime and length == 4
+    for prime, root16 in pairs:
+        # The pairs carry 16th roots; this case's length is 4, and
+        # root16**4 has exact order 4.
+        root = pow(root16, 4, prime)
+        expected, _ = ntt._residues_mod_prime(
+            prime, root, length, support, sev_index, big_q, freq_runs,
+            ds, kmax)
+        got = _engine_residues(prime, root, length, support, sev_index,
+                               big_q, freq_runs, ds, kmax)
+        assert np.array_equal(got, expected), f'prime {prime}'
+    assert ds % pairs[0][0] == 0, 'the singular branch was exercised'
+
+
+@pytest.mark.parametrize('seed', range(4))
+def test_transform_end_to_end_matches_oracle(seed):
+    """The whole engine pipeline against the polynomial oracle.
+
+    Residues from the engine's transform feed the engine's reconstruction,
+    and the integers must equal ``exact_compound_poly``'s bit for bit. This
+    is the full pipeline with no Python kernel in the loop, which neither
+    per-kernel test gives on its own.
+    """
+    ntt = pytest.importorskip('aggregate.ntt')
+
+    rng = random.Random(1000 + seed)
+    freq_outcomes = sorted(set(rng.randint(0, 12)
+                               for _ in range(rng.randint(1, 5))))
+    freq_weights = [rng.randint(1, 9) for _ in freq_outcomes]
+    total = sum(freq_weights)
+    freq_probs = [Fraction(w, total) for w in freq_weights]
+    sev_outcomes = sorted(set(rng.randint(1, 9)
+                              for _ in range(rng.randint(1, 4))))
+    sev_weights = [rng.randint(1, 9) for _ in sev_outcomes]
+    sev_total = sum(sev_weights)
+    sev_probs = [Fraction(w, sev_total) for w in sev_weights]
+
+    expected, denominator, _ = ntt.exact_compound_poly(
+        freq_outcomes, freq_probs, sev_outcomes, sev_probs)
+
+    (sev_index, big_q, freq_runs, ds, kmax, support, length,
+     _) = _transform_inputs(freq_outcomes, freq_probs, sev_outcomes,
+                            sev_probs)
+    pairs = ntt.ntt_primes(length, denominator)
+    primes = [p for p, _ in pairs]
+    reconstructor = aggregate_ntt.Reconstructor(primes, support + 1)
+    for prime, root in pairs:
+        reconstructor.push(_engine_residues(
+            prime, root, length, support, sev_index, big_q, freq_runs,
+            ds, kmax))
+    limbs, modulus_bytes = reconstructor.finish()
+    modulus = int.from_bytes(modulus_bytes, 'little')
+    numerators = [int.from_bytes(row.tobytes(), 'little') for row in limbs]
+
+    assert modulus > denominator
+    assert numerators == expected
+    assert sum(numerators) == denominator
+
+
+def test_residues_mod_prime_refusals():
+    """Contract violations are loud refusals, never silent folding."""
+    ntt = pytest.importorskip('aggregate.ntt')
+    (prime, root), = ntt.ntt_primes(16, 2)
+    sev_index = np.array([1, 2], dtype=np.int64)
+    sev_weights = np.array([1, 1], dtype=np.uint64)
+    good = dict(length=16, support=4, sev_index=sev_index,
+                sev_weights=sev_weights, freq_runs=[(1, 2, 1)], ds=2, kmax=2)
+
+    def call(**overrides):
+        arguments = {'prime': prime, 'root': root, **good, **overrides}
+        return aggregate_ntt.residues_mod_prime(*arguments.values())
+
+    with pytest.raises(ValueError, match='odd prime below 2\\*\\*63'):
+        call(prime=2 ** 63 + 1)
+    with pytest.raises(ValueError, match='odd prime'):
+        call(prime=100)
+    with pytest.raises(ValueError, match='not a primitive'):
+        call(root=1)
+    with pytest.raises(ValueError, match='power of two'):
+        call(length=12)
+    with pytest.raises(ValueError, match='does not fit transform length'):
+        call(support=16)
+    with pytest.raises(ValueError, match='ds .* not reduced'):
+        call(ds=prime)
+    with pytest.raises(ValueError, match='severity weight .* not reduced'):
+        call(sev_weights=np.array([1, prime], dtype=np.uint64))
+    with pytest.raises(ValueError, match='frequency weight .* not reduced'):
+        call(freq_runs=[(1, 2, prime)])
+    with pytest.raises(ValueError, match='end at 2 but kmax is 3'):
+        call(kmax=3)
+    with pytest.raises(ValueError, match='outside the transform length'):
+        call(sev_index=np.array([1, 16], dtype=np.int64))
+
+
+def test_residues_mod_prime_aliasing_check_is_decisive():
+    """A support smaller than the truth raises, mirroring the Python check.
+
+    Understating the support leaves true coefficients beyond it, which the
+    engine must refuse exactly as ``_residues_mod_prime`` does, because a
+    truncated answer is a wrong answer.
+    """
+    ntt = pytest.importorskip('aggregate.ntt')
+    freq_outcomes, freq_probs = [1, 2, 3, 4], [Fraction(1, 4)] * 4
+    sev_outcomes, sev_probs = [1, 2, 3, 4], [Fraction(1, 4)] * 4
+    (sev_index, big_q, freq_runs, ds, kmax, support, length,
+     denominator) = _transform_inputs(freq_outcomes, freq_probs,
+                                      sev_outcomes, sev_probs)
+    prime, root = ntt.ntt_primes(length, denominator)[0]
+    with pytest.raises(AssertionError, match='beyond the support'):
+        _engine_residues(prime, root, length, support - 1, sev_index,
+                         big_q, freq_runs, ds, kmax)

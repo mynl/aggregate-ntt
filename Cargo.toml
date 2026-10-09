@@ -1,6 +1,6 @@
 [package]
 name = "aggregate_ntt"
-version = "1.0.0-alpha.2"
+version = "1.0.0-alpha.3"
 edition = "2021"
 rust-version = "1.85"
 description = "Exact bounded discrete compound distributions: NTT over prime fields plus CRT reconstruction."

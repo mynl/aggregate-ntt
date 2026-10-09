@@ -2,6 +2,46 @@
 
 Keep a Changelog / SemVer, newest first.
 
+## 1.0.0a3 - 2026-10-09
+
+**[Transform-32] the per-prime transform kernel is real, and the seam moved
+to protocol 2.** `residues_mod_prime` mirrors
+`aggregate.ntt._residues_mod_prime` step for step: forward radix-2 NTT of the
+severity polynomial, spectral evaluation over the frequency runs (geometric
+series on long runs, singular walk when the prime divides the severity
+denominator), inverse NTT. One Montgomery field with 64-bit words serves odd
+primes below `2**63`, so the same kernel will carry `[Transform-64]`; every
+overflow bound is stated beside its line, including the `t + m * p` sum that
+killed the numba attempt.
+
+- **`PROTOCOL_VERSION` is now 2.** Landing the kernel changed its signature:
+  `ds` is a reduced `u64` scalar, not an array, and all weights arrive
+  already reduced modulo the prime (the caller-side reduction is the same
+  one line the Python reference runs internally). No protocol 1 caller could
+  ever have computed with the old signature (it always raised), but any
+  signature change bumps. `aggregate` must set `_ENGINE_PROTOCOL = 2`; until
+  it does, `'auto'` falls back to pure Python with one warning and `'rust'`
+  refuses, both by its own design.
+- Headline 1000 x 1000 case at 321 32-bit primes, 16 workers: transform
+  phase alone 4.3 s against the 10 s acceptance and 104.8 s Python serial;
+  end to end through the engine (transform, reconstruction, conversion,
+  denominator check) 10.3 s against Python's 212.3 s.
+- Unreduced weights, an unreduced `ds`, a non-primitive root, an even or
+  too-wide prime, inconsistent runs, and an understated support are all loud
+  refusals; the aliasing check beyond the support raises exactly as the
+  Python reference does.
+- Conformance: bit-for-bit per prime against `_residues_mod_prime` on three
+  shapes covering every spectral branch plus the singular-prime case, and a
+  full-pipeline test (engine transform into engine reconstruction) against
+  `exact_compound_poly`. 30 passed, 4 xfailed (the `ntt_engine='rust'` tests
+  that flip to XPASS when `aggregate` speaks protocol 2).
+- One algorithmic substitution with identical values: `(b - 1)**-1` uses
+  Montgomery batch inversion (three multiplies per element and one scalar
+  Fermat) instead of the elementwise Fermat exponentiation, which matters
+  double at 64-bit primes.
+- `dev/bench-transform.py` reproduces the measurement; `--width 64` is ready
+  for `[Transform-64]`.
+
 ## 1.0.0a2 - 2026-10-09
 
 **[Rust-Reconstruction] the Chinese remainder kernel is real.** The

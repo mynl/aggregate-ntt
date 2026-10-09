@@ -7,20 +7,16 @@ repository, which is this plan's reflected half.
 
 ## In flight
 
-Nothing in flight. `[Rust-Transform]` is next, and the `aggregate` side's
-`[NTT-Rust-Integration]` plan is now unblocked by `[Rust-Reconstruction]`
-landing.
+- **[Transform-64]** (`dev/plan-rust-engine.md`, the second half of
+  `[Rust-Transform]`) — the kernel already accepts odd primes below `2**63`,
+  so what remains is widening `Reconstructor` from `u32` to `u64` primes (a
+  compatible widening, no protocol change), 64-bit conformance tests with
+  locally generated primes, and the headline measurement at about 160 wide
+  primes. The author ruled 2026-10-09 that `aggregate`'s `ntt_primes` grows
+  a width parameter and reports the primes over; the engine's ceiling it
+  must respect is `p < 2**63` (Montgomery headroom).
 
 ## Next
-
-- **[Rust-Transform]** — the per-prime transform. Compiled butterflies for the
-  register win, `rayon` across primes for the real parallel speedup Python
-  cannot have, and 64-bit primes via `u128`, which halves the prime count from
-  321 to about 160. Two consequences to handle deliberately: prime selection
-  must learn a width, and the two engines will then use different prime sets,
-  so conformance tests must compare *answers* and never audit records. Carry
-  the overflow finding: `t + m * p` in a Montgomery reduction overflows at
-  these prime sizes, and the high-word formulation is the fix.
 
 - **[Rust-Query-Object]** — stop materializing 1.25 GB of Python integers
   nobody reads. A handle holding the bigints on the Rust side, answering for
@@ -30,6 +26,16 @@ landing.
   reshapes how `aggregate` builds `p_exact`.
 
 ## Recently landed
+
+- **[Transform-32]** DONE at **1.0.0a3** (2026-10-09): the per-prime
+  transform kernel, mirroring `_residues_mod_prime` step for step in one
+  Montgomery field (64-bit words, odd primes below `2**63`) that will carry
+  `[Transform-64]` unchanged. Headline transform phase 4.3 s against the
+  10 s acceptance (Python: 104.8 s serial); end to end through the engine
+  10.3 s against 212.3 s. **The seam moved to protocol 2** (`ds` became a
+  reduced scalar as the kernel landed); `aggregate` owes
+  `_ENGINE_PROTOCOL = 2`. Execution log in `dev/plan-rust-engine.md`,
+  benchmark in `dev/bench-transform.py`.
 
 - **[Rust-Reconstruction]** DONE at **1.0.0a2** (2026-10-09): the Chinese
   remainder kernel, a balanced product tree built online as a merge stack
