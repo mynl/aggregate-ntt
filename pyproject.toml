@@ -44,11 +44,17 @@ dev = [
     "pytest>=7",
     "pytest-xdist>=3",
     "ruff>=0.6",
-    # The conformance suite compares this engine against the pure-Python
-    # reference, so it needs the library it accelerates. Only the dev extra
-    # depends on `aggregate`: the runtime dependency must stay one way, or the
-    # two packages cannot be installed independently.
-    "aggregate>=1.2.0a4",
+    # `aggregate` is deliberately NOT listed here, even though the conformance
+    # suite needs it. The exact-compound surface this engine accelerates
+    # (`aggregate.ntt`) is newer than anything on PyPI, so a version
+    # constraint here would be unresolvable. Install it editable from a local
+    # checkout instead:
+    #
+    #     uv pip install -e <path to the aggregate checkout>
+    #
+    # The conformance tests `importorskip` it, so the suite is green without
+    # it and the engine's own seam tests still run. The runtime dependency
+    # must stay one way regardless: this package never imports `aggregate`.
 ]
 
 [project.urls]

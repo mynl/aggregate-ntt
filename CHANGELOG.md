@@ -18,6 +18,7 @@ and every later 3.x, mixed Rust and Python layout with the public surface in
 
 Verified rather than asserted: `maturin develop --release` builds and installs,
 the module imports and reports its version and protocol, and `pytest` gives 5
-passing seam tests against 9 `xfail` kernel tests. The conformance suite needs
-an `aggregate` checkout carrying `aggregate.ntt` (1.1.0 or later) installed
-editable; without it those tests skip rather than fail.
+passing seam tests against 9 `xfail` kernel tests. The conformance suite needs an
+`aggregate` checkout carrying `aggregate.ntt` installed editable by hand,
+deliberately not declared as an extra because that surface is newer than
+anything on PyPI; without it those tests skip rather than fail.

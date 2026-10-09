@@ -60,13 +60,22 @@ signature, bump it, and say so in `CHANGELOG.md` and in the integration plan.
 ## Commands
 
 ```
-uv sync --extra dev                  # Python side, including aggregate
+uv venv
+uv pip install maturin numpy pytest pytest-xdist ruff
+uv pip install -e <path to an aggregate checkout>   # for the conformance suite
 uv run maturin develop --release     # build and install into .venv
 uv run pytest                        # conformance suite
 cargo check                          # fast type check, no Python needed
 cargo clippy --all-targets           # lints
 cargo fmt                            # format
 ```
+
+**`aggregate` is installed by hand, not by an extra.** The surface this engine
+accelerates, `aggregate.ntt`, is newer than anything on PyPI, so a version
+constraint in `pyproject.toml` would be unresolvable. The conformance tests
+`importorskip` it: without it they skip and the seam tests still run, which is
+how `cargo`-only work stays possible. Set `UV_LINK_MODE=copy` when invoking
+`uv` on this drive.
 
 `maturin develop` without `--release` builds a debug binary that is 10x to 50x
 slower. **Never quote a measurement from a debug build.** Benchmarks are
