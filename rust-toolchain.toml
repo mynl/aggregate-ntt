@@ -1,0 +1,4 @@
+# Pinned so a rebuild on another day is the same build. Bump deliberately.
+[toolchain]
+channel = "1.98.0"
+components = ["rustfmt", "clippy"]

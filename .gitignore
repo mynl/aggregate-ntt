@@ -1,0 +1,29 @@
+# Build churn lives in the checkout and is ignored (V:\dev\CLAUDE.md).
+target/
+.venv/
+dist/
+build/
+*.egg-info/
+__pycache__/
+*.py[cod]
+*.so
+*.pyd
+*.pdb
+.pytest_cache/
+.ruff_cache/
+# Cargo.lock IS committed: this crate ships as a wheel, so the build wants to
+# be reproducible. It is a binary artifact's lock, not a library's.
+
+# Secrets and machine-local settings
+.env
+*.local.yaml
+
+# Data never enters this repository. Fixtures are synthetic and committed
+# under fixtures/ if any are ever needed.
+*.csv
+!fixtures/**/*.csv
+*.parquet
+*.feather
+*.db
+*.sqlite
+*.log

@@ -1,0 +1,71 @@
+[build-system]
+requires = ["maturin>=1.7,<2"]
+build-backend = "maturin"
+
+[project]
+name = "aggregate-ntt"
+version = "1.0.0a1"
+description = "Compiled engine for exact bounded discrete compound distributions, an optional accelerator for the aggregate library."
+readme = "README.md"
+requires-python = ">=3.13"
+license = { file = "LICENSE" }
+authors = [
+    { name = "Stephen J. Mildenhall", email = "mynl@me.com" },
+]
+maintainers = [
+    { name = "Stephen J. Mildenhall", email = "mynl@me.com" },
+]
+keywords = [
+    "actuarial",
+    "insurance",
+    "aggregate loss",
+    "compound distribution",
+    "number theoretic transform",
+    "chinese remainder theorem",
+    "exact arithmetic",
+    "rust",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Financial and Insurance Industry",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: BSD License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Rust",
+    "Topic :: Scientific/Engineering :: Mathematics",
+]
+dependencies = [
+    "numpy>=1.26",
+]
+
+[project.optional-dependencies]
+dev = [
+    "maturin>=1.7,<2",
+    "pytest>=7",
+    "pytest-xdist>=3",
+    "ruff>=0.6",
+    # The conformance suite compares this engine against the pure-Python
+    # reference, so it needs the library it accelerates. Only the dev extra
+    # depends on `aggregate`: the runtime dependency must stay one way, or the
+    # two packages cannot be installed independently.
+    "aggregate>=1.2.0a4",
+]
+
+[project.urls]
+Homepage = "https://github.com/mynl/aggregate-ntt"
+Repository = "https://github.com/mynl/aggregate-ntt"
+
+[tool.maturin]
+# Mixed layout: a thin Python package in `python/` wrapping the compiled
+# `_engine` module, so the public surface, the protocol version and the
+# docstrings live in Python where they are readable and testable.
+python-source = "python"
+module-name = "aggregate_ntt._engine"
+features = ["pyo3/extension-module"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-n auto"
+
+[tool.ruff]
+line-length = 79

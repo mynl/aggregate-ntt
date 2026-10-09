@@ -1,0 +1,39 @@
+[package]
+name = "aggregate_ntt"
+version = "1.0.0-alpha.1"
+edition = "2021"
+rust-version = "1.85"
+description = "Exact bounded discrete compound distributions: NTT over prime fields plus CRT reconstruction."
+authors = ["Stephen J. Mildenhall <mynl@me.com>"]
+license = "BSD-3-Clause"
+repository = "https://github.com/mynl/aggregate-ntt"
+
+[lib]
+# PyO3 requires the crate name to match the module name imported from Python.
+name = "_engine"
+crate-type = ["cdylib"]
+
+[dependencies]
+# abi3-py313 builds one wheel that works on 3.13 and every later 3.x.
+pyo3 = { version = "0.29", features = ["extension-module", "abi3-py313"] }
+numpy = "0.29"
+# Work stealing across coefficient chunks. No GIL to contend with once the
+# extension releases it, which is the whole reason this crate exists.
+rayon = "1.12"
+# MIT/Apache, Karatsuba and Toom-3 multiplication, schoolbook division. The
+# division is the step the reconstruction spends its time in, so if it proves
+# to dominate, the fallback is `rug` (GMP). See dev/plan-rust-engine.md,
+# [Rust-Bigint-Choice]: the licensing is containable here precisely because
+# this crate is a separate distribution.
+num-bigint = "0.5"
+num-integer = "0.1"
+num-traits = "0.2"
+
+[profile.release]
+# The author builds locally for one machine; a published wheel would drop
+# target-cpu. See dev/plan-rust-engine.md, [Rust-Build-Local].
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+# Deliberately NOT panic = "abort": PyO3 turns an unwinding panic into a
+# Python exception, and aborting would take the interpreter down with it.
