@@ -1,14 +1,16 @@
 # [Rust-Engine] a compiled engine for exact compound distributions
 
 Status: `[Rust-Scaffold]` **DONE** at 1.0.0a1, `[Rust-Reconstruction]`
-**DONE** at 1.0.0a2, and the 32-bit half of `[Rust-Transform]` **DONE** at
-1.0.0a3 as `[Transform-32]`, all 2026-10-09; see the execution log at the
-end. **The seam is at protocol 2 since 1.0.0a3** and `aggregate` owes
-`_ENGINE_PROTOCOL = 2`. `[Transform-64]` is in flight. `[Rust-Query-Object]`
-was not promoted, since the limb conversion came in at 0.9 s against its 3 s
-budget. Ruling of 2026-10-09 on prime selection: `aggregate.ntt.ntt_primes`
-grows a width parameter (option 1 of the integration plan) and the engine's
-ceiling is `p < 2**63`.
+**DONE** at 1.0.0a2, and `[Rust-Transform]` **DONE** across 1.0.0a3
+(`[Transform-32]`) and 1.0.0a4 (`[Transform-64]`), all 2026-10-09; see the
+execution log at the end. **Both kernels are real. The seam is at protocol 2
+since 1.0.0a3** and `aggregate` owes `_ENGINE_PROTOCOL = 2`. The headline
+case runs end to end through the engine in **7.4 s** against 212.3 s.
+`[Rust-Query-Object]` was not promoted, since the limb conversion came in at
+0.9 s against its 3 s budget; it remains next if wanted. Ruling of
+2026-10-09 on prime selection: `aggregate.ntt.ntt_primes` grows a width
+parameter (option 1 of the integration plan) and the engine's ceiling is
+`p < 2**63`.
 
 This plan is written for a reader with no prior context, including no memory of
 the `aggregate` session that produced it. Its reflected half is
@@ -489,3 +491,30 @@ The prime-width ruling arrived with this phase (2026-10-09): `aggregate`'s
 of the integration plan. The ceiling the engine imposes is `p < 2**63`,
 Montgomery headroom; `ntt_primes` at width 64 must scan below `2**63`, not
 `2**64`.
+
+### [Transform-64], DONE at 1.0.0a4 on 2026-10-09
+
+The transform kernel was built width-agnostic at 1.0.0a3, so this phase is
+the seam's other half and the evidence: `Reconstructor` widened from `u32`
+to `u64` primes (a compatible widening, every earlier call shape still
+valid, so `PROTOCOL_VERSION` stays 2), conformance of the whole pipeline at
+64-bit primes against `exact_compound_poly` bit for bit, the merge stack
+pinned over hardcoded 63-bit primes, and the headline measurement in the
+production configuration.
+
+**Measured on DOOB, release build with `target-cpu=native`, via
+`dev/bench-transform.py --width 64`** (159 primes of 63 bits for the
+`2**9976` bound, 16 workers):
+
+| measure | result | plan target |
+|---|---|---|
+| prime count | 159 against 321 | about 160, halved |
+| transform phase alone | 2.1 s | at or below 10 s |
+| end to end through the engine | 7.4 s | low tens of seconds |
+
+Against the pure-Python 212.3 s at eight workers that is about 29x, and the
+end-to-end answer passes the denominator check exactly. No divergences: the
+phase landed as specified, with the 64-bit test primes generated in the
+test file by the no-factoring root search (`r = x**((p - 1) / L)` has order
+exactly `L` iff `r**(L / 2) != 1`), the same shape recorded for
+`ntt_primes`'s width extension.

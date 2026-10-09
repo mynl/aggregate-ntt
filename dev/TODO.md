@@ -7,14 +7,9 @@ repository, which is this plan's reflected half.
 
 ## In flight
 
-- **[Transform-64]** (`dev/plan-rust-engine.md`, the second half of
-  `[Rust-Transform]`) — the kernel already accepts odd primes below `2**63`,
-  so what remains is widening `Reconstructor` from `u32` to `u64` primes (a
-  compatible widening, no protocol change), 64-bit conformance tests with
-  locally generated primes, and the headline measurement at about 160 wide
-  primes. The author ruled 2026-10-09 that `aggregate`'s `ntt_primes` grows
-  a width parameter and reports the primes over; the engine's ceiling it
-  must respect is `p < 2**63` (Montgomery headroom).
+Nothing in flight. Both kernels are done; the ball is in `aggregate`'s court
+(`_ENGINE_PROTOCOL = 2`, the transform handover, `ntt_primes` at width 64
+scanning below `2**63`). `[Rust-Query-Object]` is next here when wanted.
 
 ## Next
 
@@ -26,6 +21,13 @@ repository, which is this plan's reflected half.
   reshapes how `aggregate` builds `p_exact`.
 
 ## Recently landed
+
+- **[Transform-64]** DONE at **1.0.0a4** (2026-10-09), completing
+  `[Rust-Transform]`: `Reconstructor` widened to `u64` primes (compatible,
+  protocol stays 2), 64-bit conformance through the whole pipeline, and the
+  headline case at 159 primes of 63 bits in **7.4 s end to end** against
+  Python's 212.3 s, about 29x. The prime count halved from 321 as the plan
+  predicted.
 
 - **[Transform-32]** DONE at **1.0.0a3** (2026-10-09): the per-prime
   transform kernel, mirroring `_residues_mod_prime` step for step in one

@@ -139,7 +139,7 @@ fn merge(left: Partial, right: Partial) -> Partial {
 /// residue vector per prime, then call `finish` once.
 #[pyclass]
 pub struct Reconstructor {
-    primes: Vec<u32>,
+    primes: Vec<u64>,
     n_coefficients: usize,
     pushed: usize,
     finished: bool,
@@ -150,10 +150,16 @@ pub struct Reconstructor {
 impl Reconstructor {
     /// Create an accumulator for `primes` over `n_coefficients` coefficients.
     ///
-    /// The primes must be distinct and below `2**32`; they are the moduli the
+    /// The primes must be distinct `u64` values; they are the moduli the
     /// caller's transform phase worked in, in the order its residues arrive.
+    /// The reconstruction itself is arbitrary-precision, so it carries no
+    /// width ceiling of its own; the system ceiling of `2**63` belongs to
+    /// the transform's Montgomery arithmetic (`residues_mod_prime`), which
+    /// is where primes are selected against it. Widened from `u32` at
+    /// 1.0.0a4 for `[Transform-64]`: a compatible widening, every earlier
+    /// call shape still valid, so `PROTOCOL_VERSION` stays 2.
     #[new]
-    fn new(primes: Vec<u32>, n_coefficients: usize) -> PyResult<Self> {
+    fn new(primes: Vec<u64>, n_coefficients: usize) -> PyResult<Self> {
         if primes.is_empty() {
             return Err(PyValueError::new_err("primes must not be empty"));
         }
@@ -214,7 +220,7 @@ impl Reconstructor {
         // Copy out while the GIL is held: the borrowed array cannot cross
         // detach, and the copy also normalizes any striding.
         let values: Vec<u64> = view.iter().copied().collect();
-        let prime = u64::from(self.primes[self.pushed]);
+        let prime = self.primes[self.pushed];
         if let Some(bad) = values.iter().find(|&&r| r >= prime) {
             return Err(PyValueError::new_err(format!(
                 "residue {bad} is not reduced modulo prime {prime}"

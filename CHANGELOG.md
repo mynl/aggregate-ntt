@@ -2,6 +2,28 @@
 
 Keep a Changelog / SemVer, newest first.
 
+## 1.0.0a4 - 2026-10-09
+
+**[Transform-64] 64-bit primes through both kernels, completing
+`[Rust-Transform]`.** The transform kernel already accepted odd primes below
+`2**63`; this widens `Reconstructor` from `u32` to `u64` primes, a
+compatible widening (every earlier call shape stays valid), so
+`PROTOCOL_VERSION` stays 2.
+
+- Headline 1000 x 1000 case at 159 primes of 63 bits, the production
+  configuration once `aggregate` selects wide primes: transform phase alone
+  2.1 s, end to end through the engine **7.4 s** against Python's 212.3 s at
+  eight workers, about 29x. The prime count halved from 321 exactly as the
+  plan predicted.
+- Conformance: the full pipeline at 64-bit primes against
+  `exact_compound_poly` bit for bit (different primes, same integers, which
+  is why conformance compares answers and never audit records), and the
+  merge stack over hardcoded 63-bit primes with the residue-uniqueness
+  check. 35 passed, 4 xfailed.
+- The width contract for `aggregate`: `ntt_primes` at width 64 must scan
+  below `2**63` (Montgomery headroom), and the engine refuses anything at or
+  above it. Recorded in the integration plan's engine-side note.
+
 ## 1.0.0a3 - 2026-10-09
 
 **[Transform-32] the per-prime transform kernel is real, and the seam moved

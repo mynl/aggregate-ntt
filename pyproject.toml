@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "aggregate-ntt"
-version = "1.0.0a3"
+version = "1.0.0a4"
 description = "Compiled engine for exact bounded discrete compound distributions, an optional accelerator for the aggregate library."
 readme = "README.md"
 requires-python = ">=3.13"

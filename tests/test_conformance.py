@@ -154,6 +154,14 @@ _STANDALONE_PRIMES = [
     4294878209, 4294850561, 4294828033,
 ]
 
+# Distinct 63-bit primes congruent to 1 mod 1024, just below the engine's
+# 2**63 transform ceiling, hardcoded and verified like the set above. These
+# pin the [Transform-64] configuration: wide primes through both kernels.
+_STANDALONE_PRIMES_64 = [
+    9223372036854758401, 9223372036854739969, 9223372036854675457,
+    9223372036854618113, 9223372036854615041,
+]
+
 
 @pytest.mark.parametrize('n_primes', [1, 2, 3, 13])
 def test_reconstruction_drain_shapes(n_primes):
@@ -164,6 +172,25 @@ def test_reconstruction_drain_shapes(n_primes):
     """
     primes = _STANDALONE_PRIMES[:n_primes]
     rng = np.random.default_rng(n_primes)
+    residues = [rng.integers(0, p, size=17, dtype=np.uint64) for p in primes]
+
+    numerators, modulus = _reconstruct(primes, residues)
+
+    assert modulus == np.prod([int(p) for p in primes], dtype=object)
+    for j, value in enumerate(numerators):
+        assert 0 <= value < modulus
+        for prime, head in zip(primes, residues):
+            assert value % prime == int(head[j])
+
+
+def test_reconstruction_accepts_64bit_primes():
+    """The widened seam: `u64` primes through the merge stack.
+
+    Same uniqueness argument as the 32-bit drain shapes; what this adds is
+    primes above `2**32`, refused by the seam before 1.0.0a4.
+    """
+    primes = _STANDALONE_PRIMES_64
+    rng = np.random.default_rng(64)
     residues = [rng.integers(0, p, size=17, dtype=np.uint64) for p in primes]
 
     numerators, modulus = _reconstruct(primes, residues)
@@ -415,6 +442,80 @@ def test_transform_end_to_end_matches_oracle(seed):
      _) = _transform_inputs(freq_outcomes, freq_probs, sev_outcomes,
                             sev_probs)
     pairs = ntt.ntt_primes(length, denominator)
+    primes = [p for p, _ in pairs]
+    reconstructor = aggregate_ntt.Reconstructor(primes, support + 1)
+    for prime, root in pairs:
+        reconstructor.push(_engine_residues(
+            prime, root, length, support, sev_index, big_q, freq_runs,
+            ds, kmax))
+    limbs, modulus_bytes = reconstructor.finish()
+    modulus = int.from_bytes(modulus_bytes, 'little')
+    numerators = [int.from_bytes(row.tobytes(), 'little') for row in limbs]
+
+    assert modulus > denominator
+    assert numerators == expected
+    assert sum(numerators) == denominator
+
+
+def _wide_pairs(length, bound):
+    """63-bit ``(prime, root)`` pairs with product above ``bound``.
+
+    The width-64 configuration ``aggregate.ntt.ntt_primes`` supplies once it
+    grows a width parameter: ``p = c * length + 1`` scanned down from
+    ``2**63``, primality by the library's deterministic Miller-Rabin. The
+    root needs no factoring: for a non-residue witness ``x``,
+    ``r = x**((p - 1) / length)`` has order dividing ``length`` (a power of
+    two), and order exactly ``length`` iff ``r**(length / 2) != 1``.
+    """
+    ntt = pytest.importorskip('aggregate.ntt')
+    pairs = []
+    product = 1
+    c = (2 ** 63 - 2) // length
+    while product <= bound:
+        p = c * length + 1
+        c -= 1
+        if p >= 2 ** 63 or not ntt.is_prime_u64(p):
+            continue
+        for x in range(2, 50):
+            r = pow(x, (p - 1) // length, p)
+            if r != 1 and pow(r, length // 2, p) != 1:
+                pairs.append((p, r))
+                product *= p
+                break
+    return pairs
+
+
+@pytest.mark.parametrize('seed', range(4))
+def test_transform_end_to_end_matches_oracle_64bit(seed):
+    """The whole pipeline at 64-bit primes, the production configuration.
+
+    Same integers as the oracle bit for bit, from a different prime set than
+    the pure-Python path can use: the reconstructed coefficients are
+    determined by the mathematics, not by which primes carried them, which
+    is exactly why conformance compares answers and never audit records.
+    """
+    ntt = pytest.importorskip('aggregate.ntt')
+
+    rng = random.Random(2000 + seed)
+    freq_outcomes = sorted(set(rng.randint(0, 12)
+                               for _ in range(rng.randint(1, 5))))
+    freq_weights = [rng.randint(1, 9) for _ in freq_outcomes]
+    total = sum(freq_weights)
+    freq_probs = [Fraction(w, total) for w in freq_weights]
+    sev_outcomes = sorted(set(rng.randint(1, 9)
+                              for _ in range(rng.randint(1, 4))))
+    sev_weights = [rng.randint(1, 9) for _ in sev_outcomes]
+    sev_total = sum(sev_weights)
+    sev_probs = [Fraction(w, sev_total) for w in sev_weights]
+
+    expected, denominator, _ = ntt.exact_compound_poly(
+        freq_outcomes, freq_probs, sev_outcomes, sev_probs)
+
+    (sev_index, big_q, freq_runs, ds, kmax, support, length,
+     _) = _transform_inputs(freq_outcomes, freq_probs, sev_outcomes,
+                            sev_probs)
+    pairs = _wide_pairs(length, denominator)
+    assert all(p > 2 ** 32 for p, _ in pairs), 'the width is the point'
     primes = [p for p, _ in pairs]
     reconstructor = aggregate_ntt.Reconstructor(primes, support + 1)
     for prime, root in pairs:
