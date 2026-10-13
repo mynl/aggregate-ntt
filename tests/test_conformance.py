@@ -17,11 +17,10 @@ Three references, in increasing independence:
   engine's answer too: coefficients sum to exactly the denominator, none is
   negative, and none beyond the support is nonzero.
 
-Both kernels have landed, so the per-kernel tests run for real. The four
+Both kernels have landed, so the per-kernel tests run for real, and the four
 end-to-end tests driving :func:`aggregate.ntt.exact_compound` with
-``ntt_engine='rust'`` stay expected failures until ``aggregate`` speaks seam
-protocol 2 (its ``_ENGINE_PROTOCOL``), at which point they flip to XPASS and
-their markers come off.
+``ntt_engine='rust'`` run against an ``aggregate`` that speaks seam protocol 2
+(its ``_ENGINE_PROTOCOL``).
 """
 
 import random
@@ -254,10 +253,6 @@ def test_reconstruction_recovers_oracle_coefficients(seed):
     assert numerators == expected
 
 
-@pytest.mark.xfail(reason='aggregate speaks seam protocol 1 and this engine '
-                          'speaks 2, so ntt_engine="rust" refuses; flips to '
-                          'XPASS when aggregate bumps _ENGINE_PROTOCOL',
-                   strict=False)
 @pytest.mark.parametrize('seed', range(4))
 def test_exact_compound_matches_the_polynomial_oracle(seed):
     """End to end against the oracle that shares no machinery with either.
