@@ -13,7 +13,13 @@ this package to get a correct answer.
 
 ## Status
 
-Alpha, and a deliberate side project. `aggregate`'s own pure-Python engine is
+Stable since 1.0.0 (2026-10-14). Both kernels are in, the conformance suite
+matches `aggregate`'s pure-Python reference bit for bit, and `aggregate`'s
+three end-to-end checks police every answer this engine returns. On the
+author's machine the 1000 x 1000 uniform dice of dice runs exactly in about 7
+seconds.
+
+It is still a deliberate side project. `aggregate`'s own pure-Python engine is
 fast enough for any ordinary problem: it does a 500 x 500 uniform dice of dice
 exactly in about 17 seconds and a 1000 x 1000 in about 212. This package exists
 because those numbers can be an order of magnitude better, not because they

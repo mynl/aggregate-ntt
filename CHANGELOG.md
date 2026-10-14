@@ -2,6 +2,22 @@
 
 Keep a Changelog / SemVer, newest first.
 
+## 1.0.0 - 2026-10-14
+
+**[Release-1.0] the alpha line closes.** No code changes from 1.0.0a5: both
+kernels are real, 64-bit primes run through the whole pipeline, and
+`aggregate` 1.2.0 consumes seam protocol 2 with wide primes, so the engine is
+declared stable.
+
+- Version `1.0.0` (`Cargo.toml`, the one written source); classifier
+  `Development Status :: 5 - Production/Stable`; README status updated.
+- From here the compiled seam is a SemVer public surface: a
+  `PROTOCOL_VERSION` bump is an incompatible change and takes the major
+  version, so `[Rust-Query-Object]`, if it moves the seam, is 2.0.0.
+- Not published to PyPI. Gate: 46 passed with `aggregate` 1.2.0 installed,
+  and a clean release wheel in a fresh venv reports `1.0.0` three ways and
+  passes the seam tests.
+
 ## 1.0.0a5 - 2026-10-14
 
 **[version-source] the version is written once, in `Cargo.toml`.** This

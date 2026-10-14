@@ -4,7 +4,8 @@ Status: `[Rust-Scaffold]` **DONE** at 1.0.0a1, `[Rust-Reconstruction]`
 **DONE** at 1.0.0a2, and `[Rust-Transform]` **DONE** across 1.0.0a3
 (`[Transform-32]`) and 1.0.0a4 (`[Transform-64]`), all 2026-10-09; see the
 execution log at the end. **Both kernels are real. The seam is at protocol 2
-since 1.0.0a3** and `aggregate` owes `_ENGINE_PROTOCOL = 2`. The headline
+since 1.0.0a3**, which `aggregate` speaks since its 1.2.0, and the engine
+was minted **1.0.0 on 2026-10-14**. The headline
 case runs end to end through the engine in **7.4 s** against 212.3 s.
 `[Rust-Query-Object]` was not promoted, since the limb conversion came in at
 0.9 s against its 3 s budget; it remains next if wanted. Ruling of

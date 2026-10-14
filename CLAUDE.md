@@ -122,10 +122,15 @@ House rules apply (`~\.claude\CLAUDE.md`) plus the dev tree's
 
 ## Versioning
 
-SemVer from `1.0.0a1`, alpha while the kernels land. **The version is written
-in one place, `version` in `Cargo.toml`** (SemVer, `1.0.0-alpha.5`).
-`pyproject.toml` declares it `dynamic` and maturin converts it to PEP 440
-(`1.0.0a5`) for the wheel metadata. The engine compiles it in:
+SemVer. Alpha from `1.0.0a1` to `1.0.0a5` while the kernels landed, and
+**1.0.0 since 2026-10-14**. The compiled seam is the public surface, so a
+`PROTOCOL_VERSION` bump is an incompatible change and takes the major
+version.
+
+**The version is written in one place, `version` in `Cargo.toml`** (SemVer,
+such as `1.1.0-beta.1`). `pyproject.toml` declares it `dynamic` and maturin
+converts it to PEP 440 (`1.1.0b1`) for the wheel metadata. The engine
+compiles it in:
 `engine_version()` returns the Cargo spelling and `__version__` the PEP 440
 one, both read from the binary, so a stale build shows in the audit record of
 any `aggregate` run and fails `test_engine_version_matches_cargo`.

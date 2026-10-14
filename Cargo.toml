@@ -3,7 +3,7 @@ name = "aggregate_ntt"
 # The one place the version is written. pyproject.toml declares it dynamic,
 # maturin converts it to PEP 440 for the wheel (1.0.0-alpha.5 to 1.0.0a5),
 # and the engine compiles it in, so a stale build reports a stale version.
-version = "1.0.0-alpha.5"
+version = "1.0.0"
 edition = "2021"
 rust-version = "1.85"
 description = "Exact bounded discrete compound distributions: NTT over prime fields plus CRT reconstruction."

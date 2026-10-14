@@ -7,9 +7,10 @@ repository, which is this plan's reflected half.
 
 ## In flight
 
-Nothing in flight. Both kernels are done; the ball is in `aggregate`'s court
-(`_ENGINE_PROTOCOL = 2`, the transform handover, `ntt_primes` at width 64
-scanning below `2**63`). `[Rust-Query-Object]` is next here when wanted.
+Nothing in flight. 1.0.0 is minted: both kernels are done, and `aggregate`
+speaks seam protocol 2 and selects 64-bit primes for this engine since its
+1.2.0. `[Rust-Query-Object]` is next here when wanted; if it changes the seam
+incompatibly, it is 2.0.0.
 
 ## Next
 
@@ -21,6 +22,11 @@ scanning below `2**63`). `[Rust-Query-Object]` is next here when wanted.
   reshapes how `aggregate` builds `p_exact`.
 
 ## Recently landed
+
+- **[Release-1.0]** DONE at **1.0.0** (2026-10-14): the alpha line closes
+  with no code change, since both kernels, 64-bit primes and `aggregate`'s
+  protocol 2 consumer are all in. Status, classifier and the versioning rule
+  updated; a protocol bump now takes the major.
 
 - **[version-source]** DONE at **1.0.0a5** (2026-10-14), this repository's
   `[ntt-engine]` step of `dev/done/plan-1.0.0a5-version-source.md`:

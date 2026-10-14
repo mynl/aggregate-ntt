@@ -27,7 +27,7 @@ keywords = [
     "rust",
 ]
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Financial and Insurance Industry",
     "Intended Audience :: Science/Research",
     "License :: OSI Approved :: BSD License",
