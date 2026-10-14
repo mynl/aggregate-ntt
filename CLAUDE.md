@@ -122,11 +122,17 @@ House rules apply (`~\.claude\CLAUDE.md`) plus the dev tree's
 
 ## Versioning
 
-SemVer from `1.0.0a1`, alpha while the kernels land. **The version lives in
-two files and they must not drift**: `version` in `pyproject.toml` (PEP 440,
-`1.0.0a1`) and `version` in `Cargo.toml` (SemVer, `1.0.0-alpha.1`).
-`engine_version()` reads the Cargo one, so a mismatch is visible in the audit
-record of any `aggregate` run.
+SemVer from `1.0.0a1`, alpha while the kernels land. **The version is written
+in one place, `version` in `Cargo.toml`** (SemVer, `1.0.0-alpha.5`).
+`pyproject.toml` declares it `dynamic` and maturin converts it to PEP 440
+(`1.0.0a5`) for the wheel metadata. The engine compiles it in:
+`engine_version()` returns the Cargo spelling and `__version__` the PEP 440
+one, both read from the binary, so a stale build shows in the audit record of
+any `aggregate` run and fails `test_engine_version_matches_cargo`.
+`Cargo.lock` repeats the version but is derived, and rides in the bump
+commit. A bump edits that one line and rebuilds with `maturin develop
+--release`; it touches no environment. A `uv sync` is for a dependency change
+only.
 
 Every capability change bumps. One bump, one commit, never batched, with the
 `CHANGELOG.md` section in the same commit. Claude commits version bumps;

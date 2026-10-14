@@ -45,7 +45,14 @@ fn protocol_version() -> u32 {
     PROTOCOL_VERSION
 }
 
-/// This crate's own version, for the audit record.
+/// This crate's own version, as `Cargo.toml` spells it (`1.0.0-alpha.5`).
+///
+/// # Notes
+///
+/// `Cargo.toml` is the only place the version is written. Compiling it in
+/// means a stale binary reports a stale version. The Python package exposes
+/// the PEP 440 spelling of this string as `__version__` (`1.0.0a5`), which is
+/// what `aggregate`'s audit record and `pip` show.
 #[pyfunction]
 fn engine_version() -> &'static str {
     env!("CARGO_PKG_VERSION")

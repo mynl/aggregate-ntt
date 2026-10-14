@@ -23,9 +23,12 @@ end-to-end tests driving :func:`aggregate.ntt.exact_compound` with
 (its ``_ENGINE_PROTOCOL``).
 """
 
+import importlib.metadata
 import random
+import tomllib
 from fractions import Fraction
 from math import lcm
+from pathlib import Path
 
 import numpy as np
 import pytest
@@ -44,15 +47,50 @@ def test_protocol_version_is_an_integer():
 
 
 def test_engine_version_matches_cargo():
-    """``engine_version`` reports the Cargo version, not the PEP 440 one.
+    """``engine_version`` is the version ``Cargo.toml`` holds now.
 
-    The two spellings differ deliberately (``1.0.0-alpha.1`` against
-    ``1.0.0a1``); what matters is that the compiled module reports its own
-    build rather than the Python package metadata, so a stale ``.pyd`` is
-    visible in an ``aggregate`` audit record.
+    The compiled module reports the version it was built from, so a binary
+    older than the checkout reports the old one. This is the test that fails
+    when the suite runs against a stale build after a bump, which is the
+    reason the engine compiles its version in.
     """
-    assert aggregate_ntt.__version__
-    assert aggregate_ntt.engine_version() == aggregate_ntt.__version__
+    cargo = tomllib.loads(
+        (Path(__file__).resolve().parents[1] / 'Cargo.toml').read_text())
+    assert aggregate_ntt.engine_version() == cargo['package']['version']
+
+
+def test_version_is_the_pep440_spelling_of_the_engine_version():
+    """``__version__`` is ``engine_version`` respelled, never a second source.
+
+    The two spellings differ deliberately (``1.0.0-alpha.5`` against
+    ``1.0.0a5``), and both come from the binary.
+    """
+    assert aggregate_ntt.__version__ == aggregate_ntt._pep440(
+        aggregate_ntt.engine_version())
+
+
+def test_version_matches_the_installed_metadata():
+    """``__version__`` agrees with what ``pip`` reports for this build.
+
+    maturin writes the binary and the ``dist-info`` metadata together, in
+    ``maturin develop`` and in a wheel alike, and converts the Cargo version
+    to PEP 440 as it does. Equality here therefore checks that
+    :func:`aggregate_ntt._pep440` makes exactly maturin's conversion.
+    """
+    assert aggregate_ntt.__version__ == importlib.metadata.version(
+        'aggregate-ntt')
+
+
+@pytest.mark.parametrize('cargo, pep440', [
+    ('1.0.0', '1.0.0'),
+    ('1.0.0-alpha.5', '1.0.0a5'),
+    ('1.0.0-alpha.12', '1.0.0a12'),
+    ('1.1.0-beta.3', '1.1.0b3'),
+    ('2.0.0-rc.1', '2.0.0rc1'),
+])
+def test_pep440_spelling(cargo, pep440):
+    """Each Cargo pre-release form maps to its PEP 440 spelling."""
+    assert aggregate_ntt._pep440(cargo) == pep440
 
 
 def test_reconstructor_rejects_bad_primes():

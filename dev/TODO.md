@@ -22,6 +22,12 @@ scanning below `2**63`). `[Rust-Query-Object]` is next here when wanted.
 
 ## Recently landed
 
+- **[version-source]** DONE at **1.0.0a5** (2026-10-14), this repository's
+  `[ntt-engine]` step of `dev/done/plan-1.0.0a5-version-source.md`:
+  `Cargo.toml` is the one written version, `pyproject.toml` reads it
+  dynamically, and `__version__` is its PEP 440 spelling. Divergences in
+  `dev/done/plan-1.0.0a5-version-source-notes.md`.
+
 - **[Transform-64]** DONE at **1.0.0a4** (2026-10-09), completing
   `[Rust-Transform]`: `Reconstructor` widened to `u64` primes (compatible,
   protocol stays 2), 64-bit conformance through the whole pipeline, and the

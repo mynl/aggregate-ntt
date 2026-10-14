@@ -2,6 +2,25 @@
 
 Keep a Changelog / SemVer, newest first.
 
+## 1.0.0a5 - 2026-10-14
+
+**[version-source] the version is written once, in `Cargo.toml`.** This
+repository's step of the four-repository plan that makes every package
+report its version live, so a bump edits one line and needs no `uv sync`.
+
+- `pyproject.toml` no longer holds a version: it declares
+  `dynamic = ["version"]` and maturin fills it in from `Cargo.toml`.
+  `[tool.uv] cache-keys` now watches `Cargo.toml`, so uv notices a bump.
+- `__version__` is now the PEP 440 spelling (`1.0.0a5`) where it was the
+  Cargo one (`1.0.0-alpha.4`), so `aggregate`'s audit record, the api's About
+  panel and `pip` show one form. `engine_version()` still returns the Cargo
+  string, and both still come from the binary. Not a seam change:
+  `PROTOCOL_VERSION` stays 2.
+- Tests: `engine_version()` against the `Cargo.toml` on disk (so a stale
+  build fails), `__version__` against `importlib.metadata`, and the spelling
+  conversion. 46 passed. A clean release wheel in a fresh venv reports
+  `1.0.0a5` all three ways and passes the seam tests.
+
 ## 1.0.0a4 - 2026-10-09
 
 **[Transform-64] 64-bit primes through both kernels, completing

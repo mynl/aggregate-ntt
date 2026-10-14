@@ -4,7 +4,8 @@ build-backend = "maturin"
 
 [project]
 name = "aggregate-ntt"
-version = "1.0.0a4"
+# The version is written once, in Cargo.toml; maturin fills it in from there.
+dynamic = ["version"]
 description = "Compiled engine for exact bounded discrete compound distributions, an optional accelerator for the aggregate library."
 readme = "README.md"
 requires-python = ">=3.13"
@@ -68,6 +69,12 @@ Repository = "https://github.com/mynl/aggregate-ntt"
 python-source = "python"
 module-name = "aggregate_ntt._engine"
 features = ["pyo3/extension-module"]
+
+[tool.uv]
+# uv caches this project's metadata keyed on these files. The version is
+# dynamic and lives in Cargo.toml, so without that key a bump could leave
+# `uv lock` and `uv run` carrying the old version.
+cache-keys = [{ file = "pyproject.toml" }, { file = "Cargo.toml" }]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
